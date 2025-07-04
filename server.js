@@ -165,4 +165,20 @@ app.post('/apply', cpUpload, (req, res) => {
   res.send('Application submitted');
 });
 
+// Return currently signed in user (without password)
+app.get('/user', authRequired, (req, res) => {
+  const users = loadJson(USERS_FILE);
+  const user = users.find(u => u.email === req.session.user);
+  if (!user) return res.json({});
+  const { password, token, ...data } = user;
+  res.json(data);
+});
+
+// Logout
+app.get('/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.redirect('/auth.html');
+  });
+});
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
