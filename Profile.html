@@ -13,6 +13,7 @@
     <a href="auth.html">Sign Up / Sign In</a>
     <a href="profile.html">Profile</a>
     <a href="admin.html">Admin</a>
+    <a href="/logout">Log Out</a>
   </div>
   
   <div class="container">
@@ -20,7 +21,7 @@
     <div class="form-container">
       <form action="/updateProfile" method="post" enctype="multipart/form-data">
         <label for="email">Email:</label>
-        <input type="email" id="email" name="email" required>
+        <input type="email" id="email" name="email" readonly required>
         
         <label for="phone">Phone Number:</label>
         <input type="text" id="phone" name="phone" required>
@@ -48,5 +49,16 @@
   <div class="footer">
     <p>&copy; 2025 THE SQUARE SCREWDRIVER</p>
   </div>
+  <script>
+    fetch('/user').then(r=>r.json()).then(u=>{
+      if(!u.email) return;
+      document.getElementById('email').value = u.email;
+      document.getElementById('phone').value = u.phone || '';
+      document.getElementById('familyPhone').value = u.familyPhone || '';
+      document.getElementById('age').value = u.age || '';
+      document.getElementById('address').value = u.address || '';
+      document.getElementById('idNumber').value = u.idNumber || '';
+    });
+  </script>
 </body>
 </html>
