@@ -12,44 +12,37 @@
     <a href="jobs.html">Jobs Available</a>
     <a href="auth.html">Sign Up / Sign In</a>
     <a href="profile.html">Profile</a>
+    <a href="admin.html">Admin</a>
   </div>
-  
+
   <div class="container">
     <h1>Jobs Available</h1>
-    <table>
+    <table id="jobs-table">
       <thead>
         <tr>
           <th>Job Title</th>
           <th>Location</th>
           <th>Type</th>
           <th>Description</th>
+          <th>Action</th>
         </tr>
       </thead>
-      <tbody>
-        <tr>
-          <td>Drilling Crew Member</td>
-          <td>Houston, TX</td>
-          <td>Full-Time</td>
-          <td>Join our experienced teams on drilling rigs.</td>
-        </tr>
-        <tr>
-          <td>Rig Engineer</td>
-          <td>Midland, TX</td>
-          <td>Contract</td>
-          <td>Oversee operations and rig maintenance.</td>
-        </tr>
-        <tr>
-          <td>Safety Officer</td>
-          <td>Denver, CO</td>
-          <td>Full-Time</td>
-          <td>Ensure safety and regulatory compliance on site.</td>
-        </tr>
-      </tbody>
+      <tbody></tbody>
     </table>
   </div>
-  
+
   <div class="footer">
     <p>&copy; 2025 THE SQUARE SCREWDRIVER</p>
   </div>
+<script>
+fetch('/jobs-data').then(r=>r.json()).then(data=>{
+  const tbody = document.querySelector('#jobs-table tbody');
+  data.forEach(job=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${job.title}</td><td>${job.location}</td><td>${job.type}</td><td>${job.description}</td><td><a href="apply.html?jobId=${job.id}">Apply</a></td>`;
+    tbody.appendChild(tr);
+  });
+});
+</script>
 </body>
 </html>
