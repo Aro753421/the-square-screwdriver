@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job Application</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <div class="navbar">
+    <a href="index.html">Home</a>
+    <a href="jobs.html">Jobs Available</a>
+    <a href="auth.html">Sign Up / Sign In</a>
+    <a href="profile.html">Profile</a>
+  </div>
+
+  <div class="container">
+    <h1>Job Application</h1>
+    <div class="form-container">
+      <form id="applyForm" action="/apply" method="post" enctype="multipart/form-data">
+        <input type="hidden" id="jobId" name="jobId">
+        <label for="name">Name:</label>
+        <input type="text" id="name" name="name" required>
+
+        <label for="address">Address:</label>
+        <input type="text" id="address" name="address" required>
+
+        <label for="phone">Phone:</label>
+        <input type="text" id="phone" name="phone" required>
+
+        <label for="idNumber">ID Number:</label>
+        <input type="text" id="idNumber" name="idNumber" required>
+
+        <label for="idCard">ID Card:</label>
+        <input type="file" id="idCard" name="idCard" required>
+
+        <label for="license">License:</label>
+        <input type="file" id="license" name="license" required>
+
+        <label for="schoolCert">School Certificate:</label>
+        <input type="file" id="schoolCert" name="schoolCert" required>
+
+        <input type="submit" value="Submit">
+      </form>
+    </div>
+  </div>
+
+  <div class="footer">
+    <p>&copy; 2025 THE SQUARE SCREWDRIVER</p>
+  </div>
+<script>
+const params = new URLSearchParams(location.search);
+const jobId = params.get('jobId');
+document.getElementById('jobId').value = jobId;
+</script>
+</body>
+</html>
