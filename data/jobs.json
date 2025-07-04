@@ -1,0 +1,16 @@
+[
+  {
+    "id": "1",
+    "title": "Offshore Drilling Platform Worker",
+    "location": "Gulf of Mexico",
+    "type": "Full-Time",
+    "description": "Experienced in offshore drilling operations"
+  },
+  {
+    "id": "2",
+    "title": "Onshore Drilling Platform Worker",
+    "location": "Saudi Arabia",
+    "type": "Full-Time",
+    "description": "Experienced in onshore drilling operations"
+  }
+]
