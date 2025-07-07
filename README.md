@@ -22,3 +22,4 @@ This repository contains a simple job portal for drilling platform workers. The 
 The initial admin account is `admin@example.com`. Any user signed in with this email will be able to access `admin.html` to add job vacancies.
 
 To sign out, visit `/logout` or use the **Log Out** link visible in the navigation bar once you are logged in. Your profile page now automatically loads your saved information.
+npm install
