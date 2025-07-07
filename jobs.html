@@ -13,11 +13,13 @@
     <a href="auth.html">Sign Up / Sign In</a>
     <a href="profile.html">Profile</a>
     <a href="admin.html">Admin</a>
+    <a href="applications.html">Applications</a>
     <a href="/logout">Log Out</a>
   </div>
 
   <div class="container">
     <h1>Jobs Available</h1>
+    <input type="text" id="search" placeholder="Search jobs">
     <table id="jobs-table">
       <thead>
         <tr>
@@ -36,13 +38,30 @@
     <p>&copy; 2025 THE SQUARE SCREWDRIVER</p>
   </div>
 <script>
-fetch('/jobs-data').then(r=>r.json()).then(data=>{
-  const tbody = document.querySelector('#jobs-table tbody');
-  data.forEach(job=>{
+const tbody = document.querySelector('#jobs-table tbody');
+let jobsData = [];
+function render(list) {
+  tbody.innerHTML = '';
+  list.forEach(job => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${job.title}</td><td>${job.location}</td><td>${job.type}</td><td>${job.description}</td><td><a href="apply.html?jobId=${job.id}">Apply</a></td>`;
     tbody.appendChild(tr);
   });
+}
+
+fetch('/jobs-data').then(r=>r.json()).then(data=>{
+  jobsData = data;
+  render(jobsData);
+});
+
+document.getElementById('search').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  render(jobsData.filter(job =>
+    job.title.toLowerCase().includes(q) ||
+    job.location.toLowerCase().includes(q) ||
+    job.description.toLowerCase().includes(q) ||
+    job.type.toLowerCase().includes(q)
+  ));
 });
 </script>
 </body>

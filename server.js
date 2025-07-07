@@ -144,6 +144,17 @@ app.get('/jobs-data', (req, res) => {
   res.json(loadJson(JOBS_FILE));
 });
 
+// Applications listing for admin
+app.get('/admin/applications-data', adminRequired, (req, res) => {
+  const apps = loadJson(APPS_FILE);
+  const jobs = loadJson(JOBS_FILE);
+  const withTitle = apps.map(a => ({
+    ...a,
+    jobTitle: (jobs.find(j => j.id === a.jobId) || {}).title || 'N/A'
+  }));
+  res.json(withTitle);
+});
+
 // Job application form submission
 const cpUpload = upload.fields([
   { name: 'idCard', maxCount: 1 },
