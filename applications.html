@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job Applications</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+  <div class="navbar">
+    <a href="index.html">Home</a>
+    <a href="jobs.html">Jobs Available</a>
+    <a href="auth.html">Sign Up / Sign In</a>
+    <a href="profile.html">Profile</a>
+    <a href="admin.html">Admin</a>
+    <a href="applications.html">Applications</a>
+    <a href="/logout">Log Out</a>
+  </div>
+
+  <div class="container">
+    <h1>Job Applications</h1>
+    <table id="apps-table">
+      <thead>
+        <tr>
+          <th>Job</th>
+          <th>Name</th>
+          <th>Phone</th>
+          <th>ID Number</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    <p>&copy; 2025 THE SQUARE SCREWDRIVER</p>
+  </div>
+
+  <script>
+  fetch('/admin/applications-data')
+    .then(r => r.json())
+    .then(data => {
+      const tbody = document.querySelector('#apps-table tbody');
+      data.forEach(app => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${app.jobTitle}</td><td>${app.name}</td><td>${app.phone}</td><td>${app.idNumber}</td>`;
+        tbody.appendChild(tr);
+      });
+    });
+  </script>
+</body>
+</html>
