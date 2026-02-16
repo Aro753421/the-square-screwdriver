@@ -1,11 +1,13 @@
+const { randomUUID } = require('crypto');
 const express = require('express');
-const fs = require('fs');
 const path = require('path');
 const nodemailer = require('nodemailer');
 const session = require('express-session');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcrypt');
 const multer = require('multer');
+const repository = require('./repositories');
+const { uploadBuffer } = require('./storage/objectStorage');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,37 +16,14 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname)));
 
 app.use(session({
-  secret: 'change_this_secret',
+  secret: process.env.SESSION_SECRET || 'change_this_secret',
   resave: false,
   saveUninitialized: false
 }));
 
-const DATA_DIR = path.join(__dirname, 'data');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
-const JOBS_FILE = path.join(DATA_DIR, 'jobs.json');
-const APPS_FILE = path.join(DATA_DIR, 'applications.json');
-const UPLOAD_DIR = path.join(__dirname, 'uploads');
-
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR);
-if (!fs.existsSync(USERS_FILE)) fs.writeFileSync(USERS_FILE, '[]');
-if (!fs.existsSync(JOBS_FILE)) fs.writeFileSync(JOBS_FILE, '[]');
-if (!fs.existsSync(APPS_FILE)) fs.writeFileSync(APPS_FILE, '[]');
-
-const upload = multer({ dest: UPLOAD_DIR });
-
-function loadJson(file) {
-  try {
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
-  } catch(e) { return []; }
-}
-
-function saveJson(file, data) {
-  fs.writeFileSync(file, JSON.stringify(data, null, 2));
-}
+const upload = multer({ storage: multer.memoryStorage() });
 
 const transporter = nodemailer.createTransport({
-  // Configure your SMTP here
   host: process.env.SMTP_HOST || 'smtp.example.com',
   port: Number(process.env.SMTP_PORT) || 587,
   auth: {
@@ -53,16 +32,26 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// Sign up
+async function uploadToObjectStorage(file, prefix) {
+  if (!file) return null;
+  const extension = path.extname(file.originalname || '');
+  const safePrefix = prefix.replace(/[^a-zA-Z0-9/_-]/g, '_');
+  const key = `${safePrefix}/${randomUUID()}${extension}`;
+  return uploadBuffer({
+    key,
+    buffer: file.buffer,
+    contentType: file.mimetype
+  });
+}
+
 app.post('/signup', async (req, res) => {
   const { email, password } = req.body;
-  const users = loadJson(USERS_FILE);
-  if (users.find(u => u.email === email)) return res.status(400).send('Email already exists');
+  const existing = await repository.findUserByEmail(email);
+  if (existing) return res.status(400).send('Email already exists');
+
   const hashed = await bcrypt.hash(password, 10);
   const token = Math.random().toString(36).substring(2);
-  const user = { email, password: hashed, verified: false, token };
-  users.push(user);
-  saveJson(USERS_FILE, users);
+  await repository.createUser({ email, password: hashed, token });
 
   const verifyUrl = `${req.protocol}://${req.get('host')}/verify?token=${token}`;
   await transporter.sendMail({
@@ -75,117 +64,133 @@ app.post('/signup', async (req, res) => {
   res.redirect('/auth.html');
 });
 
-// Verify
-app.get('/verify', (req, res) => {
+app.get('/verify', async (req, res) => {
   const { token } = req.query;
-  const users = loadJson(USERS_FILE);
-  const user = users.find(u => u.token === token);
-  if (user) {
-    user.verified = true;
-    delete user.token;
-    saveJson(USERS_FILE, users);
-    res.send('Account verified');
-  } else {
-    res.status(400).send('Invalid token');
-  }
+  const user = await repository.verifyUserByToken(token);
+  if (!user) return res.status(400).send('Invalid token');
+  return res.send('Account verified');
 });
 
-// Sign in
 app.post('/signin', async (req, res) => {
   const { email, password } = req.body;
-  const users = loadJson(USERS_FILE);
-  const user = users.find(u => u.email === email);
+  const user = await repository.findUserByEmail(email);
   if (!user) return res.status(400).send('Invalid credentials');
+
   const ok = await bcrypt.compare(password, user.password);
   if (!ok) return res.status(400).send('Invalid credentials');
   if (!user.verified) return res.status(400).send('Please verify your email first');
-  req.session.user = user.email;
+
+  req.session.user = { email: user.email, id: user.id };
   res.redirect('/profile.html');
 });
 
-// Middleware for authenticated users
 function authRequired(req, res, next) {
   if (!req.session.user) return res.redirect('/auth.html');
-  next();
+  return next();
 }
 
-// Profile update
-app.post('/updateProfile', authRequired, upload.single('idUpload'), (req, res) => {
-  const users = loadJson(USERS_FILE);
-  const user = users.find(u => u.email === req.session.user);
+app.post('/updateProfile', authRequired, upload.single('idUpload'), async (req, res) => {
+  let objectInfo = null;
+  if (req.file) {
+    objectInfo = await uploadToObjectStorage(req.file, `profiles/${req.session.user.id || 'anonymous'}`);
+  }
+
+  const user = await repository.updateUserProfile(req.session.user.email, {
+    phone: req.body.phone,
+    familyPhone: req.body.familyPhone,
+    age: req.body.age,
+    address: req.body.address,
+    idNumber: req.body.idNumber,
+    idUploadKey: objectInfo && objectInfo.key,
+    idUploadUrl: objectInfo && objectInfo.url
+  });
+
   if (!user) return res.status(400).send('User not found');
-  user.phone = req.body.phone;
-  user.familyPhone = req.body.familyPhone;
-  user.age = req.body.age;
-  user.address = req.body.address;
-  user.idNumber = req.body.idNumber;
-  user.idUpload = req.file ? req.file.filename : user.idUpload;
-  saveJson(USERS_FILE, users);
-  res.redirect('/profile.html');
+  return res.redirect('/profile.html');
 });
 
-// Admin middleware (simple check)
 function adminRequired(req, res, next) {
-  if (req.session.user !== 'admin@example.com') return res.status(403).send('Admin only');
-  next();
+  if (!req.session.user || req.session.user.email !== 'admin@example.com') {
+    return res.status(403).send('Admin only');
+  }
+  return next();
 }
 
-// Add job
-app.post('/admin/jobs', adminRequired, (req, res) => {
-  const jobs = loadJson(JOBS_FILE);
-  const { title, location, type, description } = req.body;
-  jobs.push({ id: Date.now().toString(), title, location, type, description });
-  saveJson(JOBS_FILE, jobs);
+app.post('/admin/jobs', adminRequired, async (req, res) => {
+  const { title, location, type, description, companyId } = req.body;
+  await repository.createCampaign({ title, location, type, description, companyId });
   res.redirect('/admin.html');
 });
 
-// Job listing
-app.get('/jobs-data', (req, res) => {
-  res.json(loadJson(JOBS_FILE));
+app.get('/jobs-data', async (req, res) => {
+  const campaigns = await repository.listCampaigns();
+  res.json(campaigns.map((c) => ({
+    id: c.id,
+    title: c.title,
+    location: c.location,
+    type: c.type,
+    description: c.description,
+    status: c.status,
+    createdAt: c.createdAt || c.created_at
+  })));
 });
 
-// Applications listing for admin
-app.get('/admin/applications-data', adminRequired, (req, res) => {
-  const apps = loadJson(APPS_FILE);
-  const jobs = loadJson(JOBS_FILE);
-  const withTitle = apps.map(a => ({
-    ...a,
-    jobTitle: (jobs.find(j => j.id === a.jobId) || {}).title || 'N/A'
-  }));
-  res.json(withTitle);
+app.get('/admin/applications-data', adminRequired, async (req, res) => {
+  const apps = await repository.listApplicationsWithCampaign();
+  res.json(apps);
 });
 
-// Job application form submission
 const cpUpload = upload.fields([
   { name: 'idCard', maxCount: 1 },
   { name: 'license', maxCount: 1 },
   { name: 'schoolCert', maxCount: 1 }
 ]);
-app.post('/apply', cpUpload, (req, res) => {
-  const applications = loadJson(APPS_FILE);
-  const appData = {
-    jobId: req.body.jobId,
+
+app.post('/apply', cpUpload, authRequired, async (req, res) => {
+  const fileEntries = Object.entries(req.files || {});
+  const uploadedFiles = {};
+
+  for (const [fieldName, files] of fileEntries) {
+    if (!files[0]) continue;
+    const objectInfo = await uploadToObjectStorage(
+      files[0],
+      `applications/${req.session.user.id || 'anonymous'}/${fieldName}`
+    );
+    uploadedFiles[fieldName] = objectInfo;
+  }
+
+  const campaigns = await repository.listCampaigns();
+  const campaign = campaigns.find((item) => item.id === req.body.jobId || item.id === req.body.campaignId);
+
+  const application = await repository.createApplication({
+    campaignId: req.body.jobId || req.body.campaignId,
+    applicantId: req.session.user.id,
+    companyId: campaign ? campaign.companyId || campaign.company_id : null,
     name: req.body.name,
     address: req.body.address,
     phone: req.body.phone,
     idNumber: req.body.idNumber,
-    files: req.files,
-  };
-  applications.push(appData);
-  saveJson(APPS_FILE, applications);
+    files: uploadedFiles
+  });
+
+  await repository.createStatusEvent({
+    applicationId: application.id,
+    applicantId: req.session.user.id,
+    companyId: application.companyId || application.company_id,
+    status: 'submitted',
+    metadata: { source: 'apply-route' }
+  });
+
   res.send('Application submitted');
 });
 
-// Return currently signed in user (without password)
-app.get('/user', authRequired, (req, res) => {
-  const users = loadJson(USERS_FILE);
-  const user = users.find(u => u.email === req.session.user);
+app.get('/user', authRequired, async (req, res) => {
+  const user = await repository.findUserByEmail(req.session.user.email);
   if (!user) return res.json({});
   const { password, token, ...data } = user;
-  res.json(data);
+  return res.json(data);
 });
 
-// Logout
 app.get('/logout', (req, res) => {
   req.session.destroy(() => {
     res.redirect('/auth.html');
